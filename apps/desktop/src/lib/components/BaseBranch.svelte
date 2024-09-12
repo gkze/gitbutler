@@ -7,6 +7,7 @@
 	import { getGitHost } from '$lib/gitHost/interface/gitHost';
 	import { ModeService } from '$lib/modes/service';
 	import { showInfo } from '$lib/notifications/toasts';
+	import InfoMessage from '$lib/shared/InfoMessage.svelte';
 	import { getContext } from '$lib/utils/context';
 	import { BranchController } from '$lib/vbranches/branchController';
 	import Button from '@gitbutler/ui/Button.svelte';
@@ -43,6 +44,36 @@
 	let updateBaseButton: UpdateBaseButton | undefined;
 </script>
 
+{#if base.diverged}
+	<div class="message-wrapper">
+		<InfoMessage style="warning" filled outlined={false}>
+			<svelte:fragment slot="content">
+				Your target branch has diverged from upstream.
+				<br />
+				Target branch is
+				<b>
+					{`ahead by ${base.divergedAhead.length}`}
+				</b>
+				commits and
+				<b>
+					{`behind by ${base.divergedBehind.length}`}
+				</b>
+				commits
+			</svelte:fragment>
+		</InfoMessage>
+
+		<Button
+			style="error"
+			kind="solid"
+			tooltip="Resets the target branch to the upstream branch. Will lose all the changes ahead of the upstream branch."
+			disabled={$mode?.type !== 'OpenWorkspace'}
+			onclick={updateBaseBranch}
+		>
+			Reset to target to upstream
+		</Button>
+	</div>
+{/if}
+
 <div class="wrapper">
 	<div class="info-text text-13">
 		There {multiple ? 'are' : 'is'}
@@ -50,7 +81,7 @@
 		{multiple ? 'commits' : 'commit'}
 	</div>
 
-	{#if base.upstreamCommits?.length > 0}
+	{#if base.upstreamCommits?.length > 0 && !base.diverged}
 		<UpdateBaseButton bind:this={updateBaseButton} showButton={false} />
 		<Button
 			style="pop"
@@ -98,6 +129,7 @@
 				isUnapplied={true}
 				commitUrl={$gitHost?.commitUrl(commit.id)}
 				type="localAndRemote"
+				divergent={base.divergedAhead.includes(commit.id)}
 			/>
 		{/each}
 	</div>
@@ -145,6 +177,12 @@
 </Modal>
 
 <style>
+	.message-wrapper {
+		display: flex;
+		flex-direction: column;
+		margin-bottom: 20px;
+		gap: 16px;
+	}
 	.wrapper {
 		display: flex;
 		flex-direction: column;

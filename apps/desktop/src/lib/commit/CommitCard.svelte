@@ -238,7 +238,7 @@
 					const mouseY = e.clientY;
 
 					const isTop = mouseY < targetTop + targetHeight / 2;
-					
+
 					dragDirection = isTop ? 'up' : 'down';
 				}}
 				use:draggableCommit={commit instanceof DetailedCommit &&

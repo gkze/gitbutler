@@ -35,6 +35,12 @@
 
 	const base = baseBranchService.base;
 
+	const displayButton = $derived.by(() => {
+		const hasUpstreamCommits = ($base?.upstreamCommits?.length ?? 0) > 0;
+		const diverged = $base?.diverged ?? true;
+		return showButton && hasUpstreamCommits && !diverged;
+	});
+
 	let modal = $state<Modal>();
 
 	let modalOpeningState = $state<'inert' | 'loading' | 'completed'>('inert');
@@ -198,7 +204,7 @@
 	{/snippet}
 </Modal>
 
-{#if showButton && ($base?.upstreamCommits.length || 0) > 0}
+{#if displayButton}
 	<Button
 		size="tag"
 		style="error"

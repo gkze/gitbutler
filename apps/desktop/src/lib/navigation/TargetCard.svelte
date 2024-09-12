@@ -18,6 +18,7 @@
 	// eslint-disable-next-line svelte/valid-compile
 	$: base = baseBranchService.base;
 	$: selected = $page.url.href.endsWith('/base');
+	$: baseBranchDiverged = !!$base?.diverged;
 </script>
 
 <DomainButton
@@ -48,6 +49,13 @@
 					</Tooltip>
 				{/if}
 				<SyncButton />
+				{#if baseBranchDiverged}
+					<Tooltip text="Your branch has diverged from the target branch">
+						<div>
+							<Icon name="warning" color="warning" />
+						</div>
+					</Tooltip>
+				{/if}
 			</div>
 			<div class="base-branch-label">
 				{#if $base?.remoteUrl.includes('github.com')}
