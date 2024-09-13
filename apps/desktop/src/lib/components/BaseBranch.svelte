@@ -19,6 +19,29 @@
 	import { LineManagerFactory, LineSpacer } from '@gitbutler/ui/commitLines/lineManager';
 	import type { BaseBranch } from '$lib/baseBranch/baseBranch';
 
+	const resetBranchTo = {
+		remote: {
+			title: 'Reset to remote',
+			header:
+				'You are about to reset the target branch to the remote branch. This will lose all the changes ahead of the remote branch.',
+			tooltip:
+				'Resets the target branch to the upstream branch. Will lose all the changes ahead of the upstream branch.',
+			color: 'warning',
+			action: updateBaseBranch
+		},
+		local: {
+			title: 'Reset to local',
+			header:
+				'You are about to reset the target branch to the local branch. This will lose all the remote changes not in the local branch.',
+			tooltip:
+				'Resets the upstream branch to the local target branch. Will lose all the remote changes not in the local branch.',
+			color: 'pop',
+			action: updateBaseBranch
+		}
+	} as const;
+
+	type ResetActionType = keyof typeof resetBranchTo;
+
 	interface Props {
 		base: BaseBranch;
 	}
@@ -37,6 +60,8 @@
 	);
 
 	let updateTargetModal = $state<Modal>();
+	let confirmResetModal = $state<Modal>();
+	let resetActionType = $state<ResetActionType | undefined>(undefined);
 	let mergeUpstreamWarningDismissedCheckbox = $state<boolean>(false);
 	let updateBaseButton = $state<UpdateBaseButton | undefined>();
 
@@ -84,6 +109,11 @@
 		if (infoText) {
 			showInfo('Stashed conflicting branches', infoText);
 		}
+	}
+
+	function confirmResetBranch(type: ResetActionType) {
+		resetActionType = type;
+		confirmResetModal?.show();
 	}
 </script>
 
@@ -164,14 +194,14 @@
 				{/snippet}
 				{#snippet action()}
 					<Button
-						style="warning"
+						style={resetBranchTo.remote.color}
 						icon="warning"
 						kind="solid"
-						tooltip="Resets the target branch to the upstream branch. Will lose all the changes ahead of the upstream branch."
+						tooltip={resetBranchTo.remote.tooltip}
 						disabled={$mode?.type !== 'OpenWorkspace'}
-						onclick={updateBaseBranch}
+						onclick={() => confirmResetBranch('remote')}
 					>
-						Reset to remote
+						{resetBranchTo.remote.title}
 					</Button>
 				{/snippet}
 			</CommitAction>
@@ -203,14 +233,14 @@
 			{/snippet}
 			{#snippet action()}
 				<Button
-					style="pop"
+					style={resetBranchTo.local.color}
 					icon="warning"
 					kind="solid"
-					tooltip="Resets the upstream branch to the local target branch. Will lose all the remote changes not in the local branch."
+					tooltip={resetBranchTo.local.tooltip}
 					disabled={$mode?.type !== 'OpenWorkspace'}
-					onclick={updateBaseBranch}
+					onclick={() => confirmResetBranch('local')}
 				>
-					Reset to local
+					{resetBranchTo.local.title}
 				</Button>
 			{/snippet}
 		</CommitAction>
@@ -275,6 +305,45 @@
 		<Button style="pop" kind="solid" type="submit">Merge Upstream</Button>
 	{/snippet}
 </Modal>
+
+{#if resetActionType}
+	<Modal
+		width="small"
+		title={resetBranchTo[resetActionType].title}
+		bind:this={confirmResetModal}
+		onSubmit={(close) => {
+			if (resetActionType) {
+				resetBranchTo[resetActionType].action();
+			}
+			close();
+		}}
+	>
+		<div class="modal-content">
+			<p class="text-12">
+				{#if resetActionType === 'remote'}
+					{base.divergedAhead.length > 1
+						? `You will lose the ${base.divergedAhead.length} local commits ahead of the remote branch.`
+						: 'You will lose the local commit ahead of the remote branch.'}
+				{:else}
+					You will force-push the local branch to the remote branch.
+					<br />
+					{base.divergedBehind.length > 1
+						? `The ${base.divergedBehind.length} changes in the remote branch will be lost.`
+						: 'The change in the remote branch will be lost.'}
+				{/if}
+			</p>
+		</div>
+
+		{#snippet controls(close)}
+			{#if resetActionType}
+				<Button style="ghost" outline onclick={close}>Cancel</Button>
+				<Button style="error" kind="solid" type="submit" icon="warning"
+					>{resetBranchTo[resetActionType].title}</Button
+				>
+			{/if}
+		{/snippet}
+	</Modal>
+{/if}
 
 <style>
 	.header-wrapper {
