@@ -8,7 +8,6 @@
 	import TabTrigger from '$lib/components/tabs/TabTrigger.svelte';
 	import Tabs from '$lib/components/tabs/Tabs.svelte';
 	import { featureBaseBranchSwitching } from '$lib/config/uiFeatureFlags';
-	import { getGitHost } from '$lib/gitHost/interface/gitHost';
 	import SettingsPage from '$lib/layout/SettingsPage.svelte';
 	import { showError } from '$lib/notifications/toasts';
 	import { platformName } from '$lib/platform/platform';
@@ -24,9 +23,7 @@
 	const baseBranchSwitching = featureBaseBranchSwitching();
 	const projectService = getContext(ProjectService);
 	const project = getContext(Project);
-	const gitHost = getGitHost();
 
-	let deleteConfirmationModal: RemoveProjectButton;
 	let isDeleting = $state(false);
 
 	async function onDeleteClicked() {
@@ -46,7 +43,7 @@
 </script>
 
 <SettingsPage title="Project settings">
-	<Tabs name="preferences" defaultSelected="project">
+	<Tabs defaultSelected="project">
 		<TabList>
 			<TabTrigger value="project">Project</TabTrigger>
 			<TabTrigger value="git">Git</TabTrigger>
@@ -74,12 +71,7 @@
 					configuration.
 				</svelte:fragment>
 				<div>
-					<RemoveProjectButton
-						bind:this={deleteConfirmationModal}
-						projectTitle={project.title}
-						{isDeleting}
-						{onDeleteClicked}
-					/>
+					<RemoveProjectButton projectTitle={project.title} {isDeleting} {onDeleteClicked} />
 				</div>
 			</SectionCard>
 		</TabContent>
