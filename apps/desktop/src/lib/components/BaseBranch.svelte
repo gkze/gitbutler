@@ -16,32 +16,36 @@
 	import Tooltip from '@gitbutler/ui/Tooltip.svelte';
 	import type { BaseBranch } from '$lib/baseBranch/baseBranch';
 
-	export let base: BaseBranch;
+	interface Props {
+		base: BaseBranch;
+	}
+
+	const { base }: Props = $props();
 
 	const branchController = getContext(BranchController);
 	const modeService = getContext(ModeService);
 	const gitHost = getGitHost();
 	const project = getContext(Project);
 
-	const mode = modeService.mode;
-
-	const mergeUpstreamWarningDismissed = projectMergeUpstreamWarningDismissed(
-		branchController.projectId
+	const mode = $derived(modeService.mode);
+	const mergeUpstreamWarningDismissed = $derived(
+		projectMergeUpstreamWarningDismissed(branchController.projectId)
 	);
 
-	let updateTargetModal: Modal;
-	let mergeUpstreamWarningDismissedCheckbox = false;
+	let updateTargetModal = $state<Modal>();
+	let mergeUpstreamWarningDismissedCheckbox = $state<boolean>(false);
+	let updateBaseButton = $state<UpdateBaseButton | undefined>();
 
-	$: multiple = base ? base.upstreamCommits.length > 1 || base.upstreamCommits.length === 0 : false;
+	const multiple = $derived(
+		base ? base.upstreamCommits.length > 1 || base.upstreamCommits.length === 0 : false
+	);
 
 	async function updateBaseBranch() {
-		let infoText = await branchController.updateBaseBranch();
+		const infoText = await branchController.updateBaseBranch();
 		if (infoText) {
 			showInfo('Stashed conflicting branches', infoText);
 		}
 	}
-
-	let updateBaseButton: UpdateBaseButton | undefined;
 </script>
 
 {#if base.diverged}
@@ -95,7 +99,7 @@
 					if ($mergeUpstreamWarningDismissed) {
 						updateBaseBranch();
 					} else {
-						updateTargetModal.show();
+						updateTargetModal?.show();
 					}
 				}
 			}}
