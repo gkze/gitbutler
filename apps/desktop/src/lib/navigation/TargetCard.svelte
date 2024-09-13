@@ -43,12 +43,11 @@
 				<Tooltip text="The branch your Workspace branches are based on and merge into.">
 					<span class="text-14 text-semibold trunk-label">Target</span>
 				</Tooltip>
-				{#if ($base?.behind || 0) > 0}
+				{#if ($base?.behind || 0) > 0 && !baseBranchDiverged}
 					<Tooltip text="Unmerged upstream commits">
 						<Badge label={$base?.behind || 0} />
 					</Tooltip>
 				{/if}
-				<SyncButton />
 				{#if baseBranchDiverged}
 					<Tooltip text="Your branch has diverged from the target branch">
 						<div>
@@ -56,6 +55,7 @@
 						</div>
 					</Tooltip>
 				{/if}
+				<SyncButton />
 			</div>
 			<div class="base-branch-label">
 				{#if $base?.remoteUrl.includes('github.com')}
