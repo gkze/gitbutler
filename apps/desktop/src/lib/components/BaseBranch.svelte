@@ -1,19 +1,22 @@
 <script lang="ts">
-	import Spacer from '../shared/Spacer.svelte';
 	import { Project } from '$lib/backend/projects';
+	import CommitAction from '$lib/commit/CommitAction.svelte';
 	import CommitCard from '$lib/commit/CommitCard.svelte';
+	import { transformAnyCommit } from '$lib/commitLines/transformers';
 	import UpdateBaseButton from '$lib/components/UpdateBaseButton.svelte';
 	import { projectMergeUpstreamWarningDismissed } from '$lib/config/config';
 	import { getGitHost } from '$lib/gitHost/interface/gitHost';
 	import { ModeService } from '$lib/modes/service';
 	import { showInfo } from '$lib/notifications/toasts';
 	import InfoMessage from '$lib/shared/InfoMessage.svelte';
+	import { groupByCondition } from '$lib/utils/array';
 	import { getContext } from '$lib/utils/context';
 	import { BranchController } from '$lib/vbranches/branchController';
 	import Button from '@gitbutler/ui/Button.svelte';
 	import Checkbox from '@gitbutler/ui/Checkbox.svelte';
 	import Modal from '@gitbutler/ui/Modal.svelte';
-	import Tooltip from '@gitbutler/ui/Tooltip.svelte';
+	import LineGroup from '@gitbutler/ui/commitLines/LineGroup.svelte';
+	import { LineManagerFactory, LineSpacer } from '@gitbutler/ui/commitLines/lineManager';
 	import type { BaseBranch } from '$lib/baseBranch/baseBranch';
 
 	interface Props {
@@ -26,6 +29,7 @@
 	const modeService = getContext(ModeService);
 	const gitHost = getGitHost();
 	const project = getContext(Project);
+	const lineManagerFactory = getContext(LineManagerFactory);
 
 	const mode = $derived(modeService.mode);
 	const mergeUpstreamWarningDismissed = $derived(
@@ -36,8 +40,43 @@
 	let mergeUpstreamWarningDismissedCheckbox = $state<boolean>(false);
 	let updateBaseButton = $state<UpdateBaseButton | undefined>();
 
+	const { satisfied: commitsAhead, rest: localAndRemoteCommits } = $derived(
+		groupByCondition(base.recentCommits, (c) => base.divergedAhead.includes(c.id))
+	);
+
 	const multiple = $derived(
 		base ? base.upstreamCommits.length > 1 || base.upstreamCommits.length === 0 : false
+	);
+
+	const mappedRemoteCommits = $derived(
+		base.upstreamCommits.length > 0
+			? [...base.upstreamCommits.map(transformAnyCommit), { id: LineSpacer.Remote }]
+			: []
+	);
+
+	const mappedLocalCommits = $derived.by(() => {
+		if (!base.diverged) return [];
+		return commitsAhead.length > 0
+			? [...commitsAhead.map(transformAnyCommit), { id: LineSpacer.Local }]
+			: [];
+	});
+
+	const mappedLocalAndRemoteCommits = $derived.by(() => {
+		return localAndRemoteCommits.length > 0
+			? [...localAndRemoteCommits.map(transformAnyCommit), { id: LineSpacer.LocalAndRemote }]
+			: [];
+	});
+
+	const lineManager = $derived(
+		lineManagerFactory.build(
+			{
+				remoteCommits: mappedRemoteCommits,
+				localCommits: mappedLocalCommits,
+				localAndRemoteCommits: mappedLocalAndRemoteCommits,
+				integratedCommits: []
+			},
+			true
+		)
 	);
 
 	async function updateBaseBranch() {
@@ -65,28 +104,17 @@
 				commits
 			</svelte:fragment>
 		</InfoMessage>
-
-		<Button
-			style="error"
-			kind="solid"
-			tooltip="Resets the target branch to the upstream branch. Will lose all the changes ahead of the upstream branch."
-			disabled={$mode?.type !== 'OpenWorkspace'}
-			onclick={updateBaseBranch}
-		>
-			Reset to target to upstream
-		</Button>
 	</div>
 {/if}
 
-<div class="wrapper">
-	<div class="info-text text-13">
-		There {multiple ? 'are' : 'is'}
-		{base.upstreamCommits.length} unmerged upstream
-		{multiple ? 'commits' : 'commit'}
-	</div>
+{#if !base.diverged && base.upstreamCommits.length > 0}
+	<div class="header-wrapper">
+		<div class="info-text text-13">
+			There {multiple ? 'are' : 'is'}
+			{base.upstreamCommits.length} unmerged upstream
+			{multiple ? 'commits' : 'commit'}
+		</div>
 
-	{#if base.upstreamCommits?.length > 0 && !base.diverged}
-		<UpdateBaseButton bind:this={updateBaseButton} showButton={false} />
 		<Button
 			style="pop"
 			kind="solid"
@@ -106,6 +134,12 @@
 		>
 			Merge into common base
 		</Button>
+	</div>
+{/if}
+
+<div class="wrapper">
+	<!-- UPSTREAM COMMITS -->
+	{#if base.upstreamCommits?.length > 0}
 		<div>
 			{#each base.upstreamCommits as commit, index}
 				<CommitCard
@@ -115,26 +149,88 @@
 					isUnapplied={true}
 					commitUrl={$gitHost?.commitUrl(commit.id)}
 					type="remote"
-				/>
+				>
+					{#snippet lines(topHeightPx)}
+						<LineGroup lineGroup={lineManager.get(commit.id)} {topHeightPx} />
+					{/snippet}
+				</CommitCard>
 			{/each}
 		</div>
-		<Spacer margin={2} />
+
+		{#if base.diverged}
+			<CommitAction backgroundColor={false}>
+				{#snippet lines()}
+					<LineGroup lineGroup={lineManager.get(LineSpacer.Remote)} topHeightPx={0} />
+				{/snippet}
+				{#snippet action()}
+					<Button
+						style="warning"
+						icon="warning"
+						kind="solid"
+						tooltip="Resets the target branch to the upstream branch. Will lose all the changes ahead of the upstream branch."
+						disabled={$mode?.type !== 'OpenWorkspace'}
+						onclick={updateBaseBranch}
+					>
+						Reset to remote
+					</Button>
+				{/snippet}
+			</CommitAction>
+		{/if}
 	{/if}
 
+	<!-- DIVERGED (LOCAL) COMMITS -->
+	{#if commitsAhead.length > 0}
+		<div>
+			{#each commitsAhead as commit, index}
+				<CommitCard
+					{commit}
+					first={index === 0}
+					last={index === commitsAhead.length - 1}
+					isUnapplied={true}
+					commitUrl={$gitHost?.commitUrl(commit.id)}
+					type="local"
+				>
+					{#snippet lines(topHeightPx)}
+						<LineGroup lineGroup={lineManager.get(commit.id)} {topHeightPx} />
+					{/snippet}
+				</CommitCard>
+			{/each}
+		</div>
+
+		<CommitAction backgroundColor={false}>
+			{#snippet lines()}
+				<LineGroup lineGroup={lineManager.get(LineSpacer.Local)} topHeightPx={0} />
+			{/snippet}
+			{#snippet action()}
+				<Button
+					style="pop"
+					icon="warning"
+					kind="solid"
+					tooltip="Resets the upstream branch to the local target branch. Will lose all the remote changes not in the local branch."
+					disabled={$mode?.type !== 'OpenWorkspace'}
+					onclick={updateBaseBranch}
+				>
+					Reset to local
+				</Button>
+			{/snippet}
+		</CommitAction>
+	{/if}
+
+	<!-- LOCAL AND REMOTE COMMITS -->
 	<div>
-		<Tooltip text="Current base for virtual branches.">
-			<h1 class="text-13 info-text text-bold">Local</h1>
-		</Tooltip>
-		{#each base.recentCommits as commit, index}
+		{#each localAndRemoteCommits as commit, index}
 			<CommitCard
 				{commit}
 				first={index === 0}
-				last={index === base.recentCommits.length - 1}
+				last={index === localAndRemoteCommits.length - 1}
 				isUnapplied={true}
 				commitUrl={$gitHost?.commitUrl(commit.id)}
 				type="localAndRemote"
-				divergent={base.divergedAhead.includes(commit.id)}
-			/>
+			>
+				{#snippet lines(topHeightPx)}
+					<LineGroup lineGroup={lineManager.get(commit.id)} {topHeightPx} />
+				{/snippet}
+			</CommitCard>
 		{/each}
 	</div>
 </div>
@@ -181,6 +277,11 @@
 </Modal>
 
 <style>
+	.header-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
 	.message-wrapper {
 		display: flex;
 		flex-direction: column;
@@ -190,7 +291,6 @@
 	.wrapper {
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
 	}
 
 	.info-text {
