@@ -1,16 +1,16 @@
 <script lang="ts">
-	import InfoMessage from '$lib/shared/InfoMessage.svelte';
 	import { Project } from '$lib/backend/projects';
 	import { BaseBranch } from '$lib/baseBranch/baseBranch';
 	import { getRemoteBranches } from '$lib/baseBranch/baseBranchService';
 	import SectionCard from '$lib/components/SectionCard.svelte';
 	import Select from '$lib/select/Select.svelte';
 	import SelectItem from '$lib/select/SelectItem.svelte';
+	import InfoMessage from '$lib/shared/InfoMessage.svelte';
+	import Spacer from '$lib/shared/Spacer.svelte';
 	import { getContext, getContextStore } from '$lib/utils/context';
 	import { BranchController } from '$lib/vbranches/branchController';
 	import { VirtualBranchService } from '$lib/vbranches/virtualBranch';
 	import Button from '@gitbutler/ui/Button.svelte';
-	import Spacer from '$lib/shared/Spacer.svelte';
 
 	const baseBranch = getContextStore(BaseBranch);
 	const vbranchService = getContext(VirtualBranchService);
